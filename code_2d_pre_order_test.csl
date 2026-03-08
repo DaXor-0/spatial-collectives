@@ -6,22 +6,26 @@ param Ph: u16;
 param algo: u16;
 param is_allred: u16;
 param step: u16;
+param tile_x: u16;
+param tile_y: u16;
+param repeats: u16;
 var is_all = is_allred;
 const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+const launch_iq: input_queue = @get_input_queue(2);
+const launch_task_id: data_task_id = if (@is_arch("wse2")) @get_data_task_id(sys_mod.LAUNCH) else @get_data_task_id(launch_iq);
 const exit_task_id: local_task_id = @get_local_task_id(18);
 const bcast_right_id: local_task_id = @get_local_task_id(19);
 const finish_sync_id: local_task_id = @get_local_task_id(20);
 const timestamp = @import_module("<time>");
 var Nx: u16 = Nx_start;
 var cur_repeat: u16 = 0;
-var repeats: u16 = 5;
 
-const reduce_2d = @import_module("modules/2d_chain_runtime.csl", .{.color_1 = @get_color(10), .color_2 = @get_color(11), .M = Ph, .N = Pw, .timestamp = timestamp});
-const broadcast_2d = @import_module("modules/2d_broadcast_runtime.csl", .{.broadcast_color = @get_color(12), .M = Ph, .N = Pw, .timestamp = timestamp, .root_x = 0, .root_y = 0});
+const reduce_2d = @import_module("modules/2d_chain_runtime.csl", .{.color_1 = @get_color(10), .color_2 = @get_color(11), .color_1_queue = 1, .color_2_queue = 1, .tile_x = tile_x, .tile_y = tile_y, .M = Ph, .N = Pw, .timestamp = timestamp});
+const broadcast_2d = @import_module("modules/2d_broadcast_runtime.csl", .{.broadcast_color = @get_color(12), .broadcast_queue = 3, .M = Ph, .N = Pw, .timestamp = timestamp, .root_x = 0, .root_y = 0});
 
-const reduce_vertical = @import_module("modules/pre_order_runtime.csl", .{.color_1 = @get_color(13), .color_2 = @get_color(14), .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw, .timestamp = timestamp, .rev=false, .is_x =true});
+const reduce_vertical = @import_module("modules/pre_order_runtime.csl", .{.color_1 = @get_color(13), .color_2 = @get_color(14), .color_1_queue = 4, .color_2_queue = 5, .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw, .timestamp = timestamp, .rev=false, .is_x =true});
 
-const reduce_horizontal = @import_module("modules/pre_order_runtime.csl", .{.color_1 = @get_color(15), .color_2 = @get_color(16), .POS_DIR = SOUTH, .NEG_DIR = NORTH, .NUM_PES = Ph, .timestamp = timestamp, .rev=false, .is_x = false});
+const reduce_horizontal = @import_module("modules/pre_order_runtime.csl", .{.color_1 = @get_color(15), .color_2 = @get_color(16), .color_1_queue = 6, .color_2_queue = 7, .POS_DIR = SOUTH, .NEG_DIR = NORTH, .NUM_PES = Ph, .timestamp = timestamp, .rev=false, .is_x = false});
 
 // tsc_size_words = 3
 // starting time of H2D/D2H
@@ -146,7 +150,10 @@ comptime {
   reduce_horizontal.configure_network();
   reduce_vertical.configure_network();
 
-  @rpc(@get_data_task_id(sys_mod.LAUNCH));
+  if (@is_arch("wse3")) {
+    @initialize_queue(launch_iq, .{ .color = sys_mod.LAUNCH });
+  }
+  @rpc(launch_task_id);
 
   @export_symbol(x_ptr, "x");
   @export_symbol(ptr_time_buf_u16, "time_buf_u16");

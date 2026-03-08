@@ -1,20 +1,34 @@
 param color_1: color;
+param color_queue: u16;
 param pe_id: u32;
 
 param POS_DIR: direction;
 param NEG_DIR: direction;
 param NUM_PES: u32;
 
+const bcast_oq = @get_output_queue(color_queue);
+const bcast_iq = @get_input_queue(color_queue);
+
 var invalid_f32 = @zeros([1]f32);
 
-var fabout = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .output_queue=@get_output_queue(3)});
-var fabin = @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_1, .input_queue=@get_input_queue(3)});
+var fabout = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .output_queue = bcast_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1});
+var fabin = if (@is_arch("wse3"))
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_1, .input_queue = bcast_iq})
+else
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_1});
 var mem = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{1} -> invalid_f32[i] });
 
 
 fn configure_network() void {
+  if (@is_arch("wse3")) {
+    @initialize_queue(bcast_iq, .{ .color = color_1 });
+    @initialize_queue(bcast_oq, .{ .color = color_1 });
+  }
   if (pe_id != 0) {
-    @block(color_1);
+    if (@is_arch("wse3")) @block(bcast_iq) else @block(color_1);
   }
   if (pe_id == 0) {
     @set_local_color_config(color_1, .{.routes = .{.rx = .{RAMP}, .tx = .{POS_DIR}}});

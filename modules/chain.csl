@@ -1,5 +1,7 @@
 param color_1: color;
 param color_2: color;
+param color_1_queue: u16;
+param color_2_queue: u16;
 param pe_id: u32;
 param POS_DIR: direction;
 param NEG_DIR: direction;
@@ -8,11 +10,23 @@ param timestamp: imported_module;
 
 const in_color = comptime get_in_color();
 const out_color = comptime get_out_color();
+const color_1_iq = @get_input_queue(color_1_queue);
+const color_1_oq = @get_output_queue(color_1_queue);
+const color_2_iq = @get_input_queue(color_2_queue);
+const color_2_oq = @get_output_queue(color_2_queue);
+const in_iq = if (in_color == color_1) color_1_iq else color_2_iq;
+const out_oq = if (out_color == color_1) color_1_oq else color_2_oq;
 
 var invalid_f32 = @zeros([1]f32);
 
-var fabout = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = out_color});
-var fabin = @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = in_color});
+var fabout = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = out_color, .output_queue = out_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = out_color});
+var fabin = if (@is_arch("wse3"))
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = in_color, .input_queue = in_iq})
+else
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = in_color});
 var mem = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{1} -> invalid_f32[i] });
 
 const dsr_mem = @get_dsr(comptime if (pe_id == NUM_PES - 1) dsr_src1 else dsr_src0, 0);
@@ -36,7 +50,13 @@ fn get_out_color() color {
 }
 
 fn configure_network() void {
-  @block(in_color);
+  if (@is_arch("wse3")) {
+    @initialize_queue(in_iq, .{ .color = in_color });
+    @initialize_queue(out_oq, .{ .color = out_color });
+    @block(in_iq);
+  } else {
+    @block(in_color);
+  }
   @set_local_color_config(in_color, .{.routes = .{.rx = .{POS_DIR}, .tx = .{RAMP}}});
   @set_local_color_config(out_color, .{.routes = .{.rx = .{RAMP}, .tx = .{NEG_DIR}}});
 }

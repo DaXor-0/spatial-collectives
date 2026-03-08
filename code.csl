@@ -7,17 +7,19 @@ param is_allred: u16;
 param step: u16;
 
 const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+const launch_iq: input_queue = @get_input_queue(2);
+const launch_task_id: data_task_id = if (@is_arch("wse2")) @get_data_task_id(sys_mod.LAUNCH) else @get_data_task_id(launch_iq);
 const exit_task_id: local_task_id = @get_local_task_id(18);
 const bcast_right_id: local_task_id = @get_local_task_id(19);
 const finish_sync_id: local_task_id = @get_local_task_id(20);
 const timestamp = @import_module("<time>");
 
 
-const broadcast_right = @import_module("modules/broadcast.csl", .{.color_1 = @get_color(9), .pe_id = pe_id, .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw});
+const broadcast_right = @import_module("modules/broadcast.csl", .{.color_1 = @get_color(9), .color_queue = 3, .pe_id = pe_id, .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw});
 
-const chain_reduce_left = @import_module("modules/reduce.csl", .{.color_1 = @get_color(10), .color_2 = @get_color(11), .pe_id = pe_id, .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw, .step = 8, .algo = 0, .timestamp = timestamp});
+const chain_reduce_left = @import_module("modules/reduce.csl", .{.color_1 = @get_color(10), .color_2 = @get_color(11), .color_1_queue = 4, .color_2_queue = 4, .pe_id = pe_id, .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw, .step = 8, .algo = 0, .timestamp = timestamp});
 
-const reduce = @import_module("modules/reduce.csl", .{.color_1 = @get_color(12), .color_2 = @get_color(13), .pe_id = pe_id, .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw, .step = step, .algo = algo, .timestamp = timestamp});
+const reduce = @import_module("modules/reduce.csl", .{.color_1 = @get_color(12), .color_2 = @get_color(13), .color_1_queue = 5, .color_2_queue = 5, .pe_id = pe_id, .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw, .step = step, .algo = algo, .timestamp = timestamp});
 
 
 // tsc_size_words = 3
@@ -105,7 +107,10 @@ comptime {
   broadcast_right.configure_network();
   chain_reduce_left.configure_network();
   reduce.configure_network();
-  @rpc(@get_data_task_id(sys_mod.LAUNCH));
+  if (@is_arch("wse3")) {
+    @initialize_queue(launch_iq, .{ .color = sys_mod.LAUNCH });
+  }
+  @rpc(launch_task_id);
 
   @export_symbol(x_ptr, "x");
   @export_symbol(ptr_time_buf_u16, "time_buf_u16");

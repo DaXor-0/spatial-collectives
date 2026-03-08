@@ -1,5 +1,7 @@
 param color_1: color;
 param color_2: color;
+param color_1_queue: u16;
+param color_2_queue: u16;
 param algo: u32;
 param pe_id: u32;
 param POS_DIR: direction;
@@ -8,11 +10,11 @@ param NUM_PES: u32;
 param step: u32;
 param timestamp: imported_module;
 
-const chain = @import_module("modules/chain.csl", .{.color_1 = color_1, .color_2 = color_2, .pe_id = pe_id, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp});
-const two_phase = @import_module("modules/two_phase.csl", .{.color_1 = color_1, .color_2 = color_2, .pe_id = pe_id, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .step = step, .timestamp = timestamp});
-const tree = @import_module("modules/tree.csl", .{.color_1 = color_1, .color_2 = color_2, .pe_id = pe_id, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp});
+const chain = @import_module("modules/chain.csl", .{.color_1 = color_1, .color_2 = color_2, .color_1_queue = color_1_queue, .color_2_queue = color_2_queue, .pe_id = pe_id, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp});
+const two_phase = @import_module("modules/two_phase.csl", .{.color_1 = color_1, .color_2 = color_2, .color_1_queue = color_1_queue, .color_2_queue = color_2_queue, .pe_id = pe_id, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .step = step, .timestamp = timestamp});
+const tree = @import_module("modules/tree.csl", .{.color_1 = color_1, .color_2 = color_2, .color_1_queue = color_1_queue, .color_2_queue = color_2_queue, .pe_id = pe_id, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp});
 
-const star = @import_module("modules/star.csl", .{.color_1 = color_1, .pe_id = pe_id, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp});
+const star = @import_module("modules/star.csl", .{.color_1 = color_1, .color_queue = color_1_queue, .pe_id = pe_id, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp});
 
 // 0: chain, 1: two phase, 2: tree
 fn configure_network() void{

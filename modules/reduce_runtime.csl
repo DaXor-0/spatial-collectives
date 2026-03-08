@@ -1,5 +1,8 @@
 param color_1: color;
 param color_2: color;
+param color_1_queue: u16;
+param color_2_queue: u16;
+param coord: u32;
 param algo: u32;
 param POS_DIR: direction;
 param NEG_DIR: direction;
@@ -9,9 +12,9 @@ param timestamp: imported_module;
 param rev: bool;
 param is_x: bool;
 
-const chain = @import_module("modules/chain_runtime.csl", .{.color_1 = color_1, .color_2 = color_2, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp, .rev = rev, .is_x = is_x});
-const two_phase = @import_module("modules/two_phase_runtime.csl", .{.color_1 = color_1, .color_2 = color_2, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .step = step, .timestamp = timestamp, .rev = rev, .is_x = is_x});
-const tree = @import_module("modules/tree_runtime.csl", .{.color_1 = color_1, .color_2 = color_2, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp, .rev = rev, .is_x = is_x});
+const chain = @import_module("modules/chain_runtime.csl", .{.color_1 = color_1, .color_2 = color_2, .color_1_queue = color_1_queue, .color_2_queue = color_2_queue, .coord = coord, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp, .rev = rev, .is_x = is_x});
+const two_phase = @import_module("modules/two_phase_runtime.csl", .{.color_1 = color_1, .color_2 = color_2, .color_1_queue = color_1_queue, .color_2_queue = color_2_queue, .coord = coord, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .step = step, .timestamp = timestamp, .rev = rev, .is_x = is_x});
+const tree = @import_module("modules/tree_runtime.csl", .{.color_1 = color_1, .color_2 = color_2, .color_1_queue = color_1_queue, .color_2_queue = color_2_queue, .coord = coord, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp, .rev = rev, .is_x = is_x});
 
 // const star = @import_module("modules/star.csl", .{.color_1 = color_1, .pe_id = pe_id, .POS_DIR = POS_DIR, .NEG_DIR = NEG_DIR, .NUM_PES = NUM_PES, .timestamp = timestamp});
 

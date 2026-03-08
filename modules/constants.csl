@@ -85,14 +85,7 @@ fn switch_pos1(dir: direction, input: u16, init_pos: u16) u16 {
 
 const fully_invalid_switch = (SWITCH_INVALID << POS1) | (SWITCH_INVALID << POS2) | (SWITCH_INVALID << POS3);
 
-////////////////////////////////////////////////////////////////////////////////
-// Base addresses for the routing table and fabric switching table
-////////////////////////////////////////////////////////////////////////////////
-
-const ROUTES_BASE: u16 = 0x7f20;
-const SWITCHES_BASE: u16 = 0x7f40;
-
 // The constants in this file only apply on EIN and FYN
 comptime {
-  @comptime_assert(@is_arch("wse1") or @is_arch("wse2"));
+  @comptime_assert(@is_arch("wse2") or @is_arch("wse3"));
 }

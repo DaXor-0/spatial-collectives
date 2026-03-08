@@ -294,7 +294,15 @@ def lower_bound(P, B, verbose=False, summary=False, tree=False):
         if_line          = ' if (pe_id == {}) '.format(i) + '{'
         end_if_line      = ' }'
         total_lines += [if_line, out_color_line, in_color_line, rcv_count_line, snd_control_line, end_if_line]
-    insert_lines_at(new_file_name, 60, total_lines)
+    with open(new_file_name, "r") as file:
+        copied_lines = file.readlines()
+
+    insert_line = next(
+        idx for idx, line in enumerate(copied_lines, start=1)
+        if "rev_id = NUM_PES - pe_id - 1;" in line
+    ) + 1
+
+    insert_lines_at(new_file_name, insert_line, total_lines)
 
 def main():
     parser = argparse.ArgumentParser(description="Greet two people by their names.")

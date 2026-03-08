@@ -3,6 +3,7 @@ import argparse
 from glob import glob
 import numpy as np
 import json
+import os
 from util import (
     hwl_2_oned_colmajor,
     oned_to_hwl_colmajor,
@@ -29,14 +30,16 @@ elf_paths = glob(f"{name}/bin/out_*.elf")
 
 with open(f"{args.name}/out.json") as json_file:
     compile_data = json.load(json_file)
-  
-Nx = int(compile_data["params"]["Nx_start"])
-Pw = int(compile_data["params"]["Pw"])
-Ph = int(compile_data["params"]["Ph"])
+
+params = compile_data["params"]
+Nx = int(params["Nx"] if "Nx" in params else params["Nx_start"])
+Pw = int(params["Pw"])
+Ph = int(params.get("Ph", 1))
 algo = int(compile_data["params"]["Algo"])
 is_allred = int(compile_data["params"]["is_allred"])
 width = Pw
 height = Ph
+measurement_repeats = 1 if os.environ.get("CEREBRAS_SIM_ENVIRONMENT") == "1" else 5
 
 print(f'Running Reduce for Pw = {Pw}, Nx = {Nx} and algorithm {algo}')
 
@@ -51,7 +54,7 @@ runner.run()
 
 for i in range(13):
   print(f'Running Reduce for Pw = {Pw}, Nx = {Nx} and algorithm {algo}')
-  for r in range(5):
+  for r in range(measurement_repeats):
     print("step 0: sync all PEs")
     runner.launch("f_sync", np.int16(1), nonblock=False)
 

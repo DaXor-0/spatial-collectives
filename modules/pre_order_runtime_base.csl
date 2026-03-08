@@ -4,6 +4,8 @@ const color_config = @import_module("modules/wse2_color_config_with_params.csl",
 const layout_module = @import_module("<layout>");
 param color_1: color;
 param color_2: color;
+param color_1_queue: u16;
+param color_2_queue: u16;
 param POS_DIR: direction;
 param NEG_DIR: direction;
 param NUM_PES: u32;
@@ -13,11 +15,12 @@ param is_x: bool;
 
 const color_1_addr: u16 = color_config.get_color_config_addr(color_1);
 const color_2_addr: u16 = color_config.get_color_config_addr(color_2);
-const switch_1_addr: u16 = consts.SWITCHES_BASE + @get_int(color_1);
-const switch_2_addr: u16 = consts.SWITCHES_BASE + @get_int(color_2);
-
-const switch_1_ptr: *u16 = @bitcast(*u16, 2 * switch_1_addr);
-const switch_2_ptr: *u16 = @bitcast(*u16, 2 * switch_2_addr);
+const switch_1_addr: u16 = color_config.get_switch_config_addr(color_1);
+const switch_2_addr: u16 = color_config.get_switch_config_addr(color_2);
+const color_1_iq = @get_input_queue(color_1_queue);
+const color_1_oq = @get_output_queue(color_1_queue);
+const color_2_iq = @get_input_queue(color_2_queue);
+const color_2_oq = @get_output_queue(color_2_queue);
 
 var pe_id: u32 = 0;
 var rev_id: u32 = 0;
@@ -32,14 +35,38 @@ var snd_visited: bool = false;
 var ctrl_mem_loc = @constants([1]u32, comptime ctrl_module.ctrl(true, ctrl_module.opcode_switch_advance, 0x00));
 
 var invalid_f32 = @zeros([1]f32);
-var fabout_1 = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1});
-var fabout_1_advance = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .advance_switch = true});
-var fabout_2 = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2});
-var fabout_2_advance = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2, .advance_switch = true});
-var fabin_1 = @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_1});
-var fabin_2 = @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_2});
-var ctrl_1 = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .control = true});
-var ctrl_2 = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2, .control = true});
+var fabout_1 = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .output_queue = color_1_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1});
+var fabout_1_advance = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .advance_switch = true, .output_queue = color_1_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .advance_switch = true});
+var fabout_2 = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2, .output_queue = color_2_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2});
+var fabout_2_advance = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2, .advance_switch = true, .output_queue = color_2_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2, .advance_switch = true});
+var fabin_1 = if (@is_arch("wse3"))
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_1, .input_queue = color_1_iq})
+else
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_1});
+var fabin_2 = if (@is_arch("wse3"))
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_2, .input_queue = color_2_iq})
+else
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_2});
+var ctrl_1 = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .control = true, .output_queue = color_1_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .control = true});
+var ctrl_2 = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2, .control = true, .output_queue = color_2_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2, .control = true});
 var fabin: fabin_dsd;
 var fabout: fabout_dsd;
 var ctrl: fabout_dsd;
@@ -77,37 +104,39 @@ fn setup() void {
 }
 
 fn configure_in() void {
-  var r_state : u16 = @bitcast(*u16, if (color_1 == in_color) color_1_addr else color_2_addr).*;
+  var color_addr: u16 = if (color_1 == in_color) color_1_addr else color_2_addr;
+  var r_state : u16 = @get_config(color_addr);
 
   // reset pos0 input/ output to nothing:
   r_state = r_state & color_config.MASK_INPUT_OUTPUT_POS0;
   
   r_state = r_state | color_config.INPUT_POS | (if (rcv_cnt == 0) color_config.OUTPUT_NEG else color_config.OUTPUT_RAMP);
-  @block(in_color);
-  @bitcast(*u16, if (color_1 == in_color) color_1_addr else color_2_addr).* = r_state;
+  if (@is_arch("wse2")) @block(in_color);
+  @set_config(color_addr, r_state);
 }
 
 fn configure_switch_in() void {
   var switch_mask: u16 = comptime consts.switch_pos1(NEG_DIR, 0, 0);
-
-  (if (in_color == color_1) switch_1_ptr else switch_2_ptr).* = switch_mask;
+  var switch_addr: u16 = if (in_color == color_1) switch_1_addr else switch_2_addr;
+  @set_config(switch_addr, switch_mask);
 }
 
 fn configure_out() void {
-  var r_state : u16 = @bitcast(*u16, if (color_1 == out_color) color_1_addr else color_2_addr).*;
+  var color_addr: u16 = if (color_1 == out_color) color_1_addr else color_2_addr;
+  var r_state : u16 = @get_config(color_addr);
 
   // reset pos0 input/ output to nothing:
   r_state = r_state & color_config.MASK_INPUT_OUTPUT_POS0;
   
   r_state = r_state | color_config.INPUT_RAMP | color_config.OUTPUT_NEG;
 
-  @bitcast(*u16, if (color_1 == out_color) color_1_addr else color_2_addr).* = r_state;
+  @set_config(color_addr, r_state);
 }
 
 fn configure_switch_out() void {
   var switch_mask: u16 = comptime consts.switch_pos1(POS_DIR, 1, 0);
-
-  (if (out_color == color_1) switch_1_ptr else switch_2_ptr).* = switch_mask;
+  var switch_addr: u16 = if (out_color == color_1) switch_1_addr else switch_2_addr;
+  @set_config(switch_addr, switch_mask);
 }
 const switches_sender = .{
   .pos1 = .{ .rx = POS_DIR },
@@ -115,8 +144,14 @@ const switches_sender = .{
   .ring_mode = false
 };
 fn configure_network() void {
-
-  // @block(in_color);
+  if (@is_arch("wse3")) {
+    @initialize_queue(color_1_iq, .{ .color = color_1 });
+    @initialize_queue(color_1_oq, .{ .color = color_1 });
+    @initialize_queue(color_2_iq, .{ .color = color_2 });
+    @initialize_queue(color_2_oq, .{ .color = color_2 });
+    @block(color_1_iq);
+    @block(color_2_iq);
+  }
   @set_local_color_config(color_1, .{.routes = .{.rx = .{}, .tx = .{}}, .switches = switches_sender});
   @set_local_color_config(color_2, .{.routes = .{.rx = .{}, .tx = .{}}, .switches = switches_sender});
   // @set_local_color_config(out_color, .{.routes = .{.rx = .{RAMP}, .tx = .{NEG_DIR}}});

@@ -2,6 +2,10 @@ const color_config = @import_module("modules/wse2_color_config.csl");
 const layout_module = @import_module("<layout>");
 param color_1: color;
 param color_2: color;
+param color_1_queue: u16;
+param color_2_queue: u16;
+param tile_x: u32;
+param tile_y: u32;
 param POS_DIR: direction;
 param NEG_DIR: direction;
 param timestamp: imported_module;
@@ -11,6 +15,15 @@ const NUM_PES = M * N;
 
 const color_1_addr: u16 = color_config.get_color_config_addr(color_1);
 const color_2_addr: u16 = color_config.get_color_config_addr(color_2);
+const color_1_iq = @get_input_queue(color_1_queue);
+const color_1_oq = @get_output_queue(color_1_queue);
+const color_2_iq = @get_input_queue(color_2_queue);
+const color_2_oq = @get_output_queue(color_2_queue);
+const pe_id_init: u32 = tile_y * N + (if (tile_y % 2 == 0) tile_x else N - tile_x - 1);
+const in_color_init = comptime get_in_color(pe_id_init);
+const out_color_init = comptime get_out_color(pe_id_init);
+const active_iq = if (in_color_init == color_1) color_1_iq else color_2_iq;
+const active_oq = if (out_color_init == color_1) color_1_oq else color_2_oq;
 
 var id_x: u32 = 0;
 var id_y: u32 = 0;
@@ -19,10 +32,22 @@ var in_color: color = color_1;
 var out_color: color = color_2;
 
 var invalid_f32 = @zeros([1]f32);
-var fabout_1 = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1});
-var fabout_2 = @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2});
-var fabin_1 = @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_1});
-var fabin_2 = @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_2});
+var fabout_1 = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1, .output_queue = color_1_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_1});
+var fabout_2 = if (@is_arch("wse3"))
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2, .output_queue = color_2_oq})
+else
+  @get_dsd(fabout_dsd, .{ .extent = 1, .fabric_color = color_2});
+var fabin_1 = if (@is_arch("wse3"))
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_1, .input_queue = color_1_iq})
+else
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_1});
+var fabin_2 = if (@is_arch("wse3"))
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_2, .input_queue = color_2_iq})
+else
+  @get_dsd(fabin_dsd, .{ .extent = 1, .fabric_color = color_2});
 var fabin: fabin_dsd;
 var fabout: fabout_dsd;
 var mem = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{1} -> invalid_f32[i] });
@@ -49,11 +74,11 @@ fn get_out_color(pe_id: u32) color {
 }
 
 fn setup() void {
-  id_x = @as(u32, layout_module.get_x_coord());
-  id_y = @as(u32, layout_module.get_y_coord());
-  pe_id = id_y * N + (if (id_y % 2 == 0) id_x else N - id_x - 1);
-  in_color = get_in_color(pe_id);
-  out_color = get_out_color(pe_id);
+  id_x = tile_x;
+  id_y = tile_y;
+  pe_id = pe_id_init;
+  in_color = in_color_init;
+  out_color = out_color_init;
   configure_in();
   configure_out();
   fabout = if (color_1 == out_color) fabout_1 else fabout_2;
@@ -81,7 +106,8 @@ fn get_tx() direction {
 }
 
 fn configure_in() void {
-  var r_state : u16 = @bitcast(*u16, if (color_1 == in_color) color_1_addr else color_2_addr).*;
+  var color_addr: u16 = if (color_1 == in_color) color_1_addr else color_2_addr;
+  var r_state : u16 = @get_config(color_addr);
 
   // reset pos0 input/ output to nothing:
   r_state = r_state & color_config.MASK_INPUT_OUTPUT_POS0;
@@ -89,24 +115,28 @@ fn configure_in() void {
   var rx = color_config.INPUT_WEST;
   
   r_state = r_state | color_config.get_input(get_rx()) | color_config.OUTPUT_RAMP;
-  @block(in_color);
-  @bitcast(*u16, if (color_1 == in_color) color_1_addr else color_2_addr).* = r_state;
+  if (@is_arch("wse2")) @block(in_color);
+  @set_config(color_addr, r_state);
 }
 
 fn configure_out() void {
-  var r_state : u16 = @bitcast(*u16, if (color_1 == out_color) color_1_addr else color_2_addr).*;
+  var color_addr: u16 = if (color_1 == out_color) color_1_addr else color_2_addr;
+  var r_state : u16 = @get_config(color_addr);
 
   // reset pos0 input/ output to nothing:
   r_state = r_state & color_config.MASK_INPUT_OUTPUT_POS0;
   
   r_state = r_state | color_config.INPUT_RAMP | color_config.get_output(get_tx());
 
-  @bitcast(*u16, if (color_1 == out_color) color_1_addr else color_2_addr).* = r_state;
+  @set_config(color_addr, r_state);
 }
 
 fn configure_network() void {
-
-  // @block(in_color);
+  if (@is_arch("wse3")) {
+    @initialize_queue(active_iq, .{ .color = in_color_init });
+    @initialize_queue(active_oq, .{ .color = out_color_init });
+    @block(active_iq);
+  }
   // @set_local_color_config(in_color, .{.routes = .{.rx = .{POS_DIR}, .tx = .{RAMP}}});
   // @set_local_color_config(out_color, .{.routes = .{.rx = .{RAMP}, .tx = .{NEG_DIR}}});
 }

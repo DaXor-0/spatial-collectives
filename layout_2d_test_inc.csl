@@ -4,6 +4,7 @@ param step: u16;
 param Nx_start: u16;
 param Algo: u16;
 param is_allred: u16;
+param repeats: u16;
 
 const LAUNCH: color = @get_color(8); // Color used by memcpy for kernel launch
 
@@ -17,7 +18,7 @@ layout {
   @set_rectangle(Pw, Ph);
   for (@range(u16, Pw)) |Px| {
     for (@range(u16, Ph)) |Py| {
-      @set_tile_code(Px, Py, "code_2d_test_inc.csl", .{.Pw = Pw, .Ph=Ph, .Nx_start = Nx_start, .algo = Algo, .memcpy_params = memcpy.get_params(Px), .is_allred = is_allred, .step = step});
+      @set_tile_code(Px, Py, "code_2d_test_inc.csl", .{.Pw = Pw, .Ph=Ph, .Nx_start = Nx_start, .algo = Algo, .memcpy_params = memcpy.get_params(Px), .is_allred = is_allred, .step = step, .tile_x = Px, .tile_y = Py, .repeats = repeats});
     }
   }
 

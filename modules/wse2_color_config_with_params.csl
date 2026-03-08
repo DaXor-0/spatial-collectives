@@ -36,40 +36,40 @@ var offramp_bit: u16 = 0x0010;
 // word_size = 2
 const word_size = tile_config.target.word_size;
 const addresses = tile_config.target.addresses;
-// COLOR_CONFIG is byte address
-// wse2: 0x7f20 * word_size
-// wse3: 0x7c00 * word_size
+// COLOR_CONFIG is a config-space word address for @get_config/@set_config
+// wse2: 0x7f20
+// wse3: 0x7c00
 fn get_color_config_addr( RXACT: color) u16 {
-  return @as(u16,addresses.COLOR_CONFIG) + @get_int(RXACT) * word_size;
+  return @as(u16, addresses.COLOR_CONFIG) / word_size + @get_int(RXACT);
 }
 
 const TAMAP_FAB_SWITCH_CFG_START_ADDR: u16 = 0x7f40;
 fn get_switch_config_addr( RXACT: color) u16 {
-  return addresses.SWITCH_CONFIG + @get_int(RXACT)* word_size;
+  return @as(u16, addresses.SWITCH_CONFIG) / word_size + @get_int(RXACT);
 }
 // offramp is ON no matter the status it was.
 fn set_offramp(COLOR_CONFIG_ADDR: u16) void {
-  var r_state : u16 = @bitcast(*u16, COLOR_CONFIG_ADDR ).* ;
+  var r_state : u16 = @get_config(COLOR_CONFIG_ADDR);
   var r_tmp : u16 = offramp_bit;
   r_state = r_state | r_tmp ;
-  @bitcast(*u16, COLOR_CONFIG_ADDR ).* = r_state;
+  @set_config(COLOR_CONFIG_ADDR, r_state);
 }
 // toggle the status of offramp.
 // case 1: offramp is ON --> new status is off
 // case 2: offramp is OFF --> new status is on
 fn toggle_offramp(COLOR_CONFIG_ADDR: u16) void {
-  var r_state: u16 = @bitcast(*u16, COLOR_CONFIG_ADDR ).*;
+  var r_state: u16 = @get_config(COLOR_CONFIG_ADDR);
   var r_tmp: u16 = offramp_bit;
   r_state = r_state ^ r_tmp;
-  @bitcast(*u16, COLOR_CONFIG_ADDR ).* = r_state;
+  @set_config(COLOR_CONFIG_ADDR, r_state);
 }
 fn remove_offramp(COLOR_CONFIG_ADDR: u16) void {
-  var r_state: u16 = @bitcast(*u16, COLOR_CONFIG_ADDR ).*;
+  var r_state: u16 = @get_config(COLOR_CONFIG_ADDR);
   var r_tmp: u16 = offramp_bit;
   if ( 0 < (r_state & r_tmp) ){  // RAMP is on
     r_state = r_state ^ r_tmp; // remove RAMP
   }
-  @bitcast(*u16, COLOR_CONFIG_ADDR ).* = r_state;
+  @set_config(COLOR_CONFIG_ADDR, r_state);
 }
 // bit 9:0 contains the routing of input and output
 const MASK_INPUT_OUTPUT_POS0: u16 = 0xfc00;

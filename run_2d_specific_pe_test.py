@@ -105,15 +105,15 @@ for r in range(5):
   f.write(f'minimum start = {np.min(time_start)}, maximum start = {np.max(time_start)}, diff = {np.max(time_start) - np.min(time_start)}\n')
   f.close()
 
-  data = [
-      ["Dim", "Pattern", "Allred", "B", "Pw", "Ph", "time", "start_diff"],
-      [2, algo, True if (is_allred == 1) else False, Nx, Pw, Ph, np.max(time_end) - np.min(time_start), np.max(time_start) - np.min(time_start)]
-  ]
+  header = ["Dim", "Pattern", "Allred", "B", "Pw", "Ph", "time", "start_diff"]
+  row = [2, algo, True if (is_allred == 1) else False, Nx, Pw, Ph, np.max(time_end) - np.min(time_start), np.max(time_start) - np.min(time_start)]
   csv_file = "data_2d.csv"
 
   with open(csv_file, mode='a', newline='') as file:
       writer = csv.writer(file)
-      writer.writerows(data)
+      if file.tell() == 0:
+          writer.writerow(header)
+      writer.writerow(row)
       
 is_allred = 1
 print(f'Running Reduce for Pw = {Pw}, Nx = {Nx} and algorithm {algo}')
@@ -172,13 +172,13 @@ for r in range(5):
   f.write(f'minimum start = {np.min(time_start)}, maximum start = {np.max(time_start)}, diff = {np.max(time_start) - np.min(time_start)}\n')
   f.close()
 
-  data = [
-      ["Dim", "Pattern", "Allred", "B", "Pw", "Ph", "time", "start_diff"],
-      [2, algo, True if (is_allred == 1) else False, Nx, Pw, Ph, np.max(time_end) - np.min(time_start), np.max(time_start) - np.min(time_start)]
-  ]
+  header = ["Dim", "Pattern", "Allred", "B", "Pw", "Ph", "time", "start_diff"]
+  row = [2, algo, True if (is_allred == 1) else False, Nx, Pw, Ph, np.max(time_end) - np.min(time_start), np.max(time_start) - np.min(time_start)]
   csv_file = "data_2d.csv"
 
   with open(csv_file, mode='a', newline='') as file:
       writer = csv.writer(file)
-      writer.writerows(data)
+      if file.tell() == 0:
+          writer.writerow(header)
+      writer.writerow(row)
 runner.stop()

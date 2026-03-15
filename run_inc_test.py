@@ -10,11 +10,21 @@ from util import oned_to_hwl_colmajor
 from cerebras.sdk.runtime.sdkruntimepybind import SdkRuntime, MemcpyDataType, MemcpyOrder  # pylint: disable=no-name-in-module
 
 
-MAX_NX = 4096
+DEFAULT_MAX_NX = 4096
 
 
 def make_u48(words):
   return words[0] + (words[1] << 16) + (words[2] << 32)
+
+
+def algorithm_name(algo):
+  return {
+      0: "chain",
+      1: "two_phase",
+      2: "tree",
+      3: "star",
+      4: "bine",
+  }.get(algo, f"unknown_{algo}")
 
 
 def collect_timestamps(runner, symbol_time_buf_u16, symbol_time_ref, width, height):
@@ -75,25 +85,27 @@ def collect_timestamps(runner, symbol_time_buf_u16, symbol_time_ref, width, heig
   return time_start - time_ref, time_end - time_ref
 
 
-def write_result(dim, algo, is_allred, nx, pw, ph, time_start, time_end):
+def write_result(dim, algo, is_allred, nx, pw, ph, time_start, time_end, results_file, csv_file):
   elapsed = np.max(time_end) - np.min(time_start)
+  total_time = np.max(time_end)
   start_diff = np.max(time_start) - np.min(time_start)
 
-  with open("results_2d.txt", "a", encoding="utf-8") as result_file:
+  collective_name = "Allreduce" if is_allred else "Reduce"
+  with open(results_file, "a", encoding="utf-8") as result_file:
     result_file.write(
-        f"{dim}D, Reduce pattern = {algo}, is allreduce = {is_allred}, "
-        f"B = {nx}, Pw = {pw}, Ph = {ph}, time = {elapsed}\n"
+        f"{dim}D, {collective_name} pattern = {algo}, is allreduce = {is_allred}, "
+        f"B = {nx}, Pw = {pw}, Ph = {ph}, time = {elapsed}, total_time = {total_time}\n"
     )
     result_file.write(
         f"minimum start = {np.min(time_start)}, maximum start = {np.max(time_start)}, "
         f"diff = {start_diff}\n"
     )
 
-  header = ["Dim", "Pattern", "Allred", "B", "Pw", "Ph", "time", "start_diff"]
-  row = [dim, algo, bool(is_allred), nx, pw, ph, elapsed, start_diff]
-  with open("data_2d.csv", "a", newline="", encoding="utf-8") as csv_file:
-    writer = csv.writer(csv_file)
-    if csv_file.tell() == 0:
+  header = ["Dim", "Pattern", "Algorithm", "Allred", "B", "Pw", "Ph", "time", "total_time", "start_diff"]
+  row = [dim, algo, algorithm_name(algo), bool(is_allred), nx, pw, ph, elapsed, total_time, start_diff]
+  with open(csv_file, "a", newline="", encoding="utf-8") as out_csv:
+    writer = csv.writer(out_csv)
+    if out_csv.tell() == 0:
       writer.writerow(header)
     writer.writerow(row)
 
@@ -101,6 +113,9 @@ def write_result(dim, algo, is_allred, nx, pw, ph, time_start, time_end):
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", help="the test name")
 parser.add_argument("--cmaddr", help="IP:port for CS system")
+parser.add_argument("--results-file", default="results_2d.txt")
+parser.add_argument("--csv-file", default="data_2d.csv")
+parser.add_argument("--nx-max", type=int, default=None)
 args = parser.parse_args()
 
 with open(f"{args.name}/out.json", encoding="utf-8") as json_file:
@@ -117,8 +132,12 @@ measurement_repeats = int(
 )
 dim = 1 if ph == 1 else 2
 
-if nx < 1 or nx > MAX_NX:
-  raise ValueError(f"Nx_start={nx} is outside the supported incremental range 1..{MAX_NX}")
+nx_max = int(params.get("Nx_max", DEFAULT_MAX_NX))
+if args.nx_max is not None:
+  nx_max = min(nx_max, args.nx_max)
+
+if nx < 1 or nx > nx_max:
+  raise ValueError(f"Nx_start={nx} is outside the supported incremental range 1..{nx_max}")
 
 runner = SdkRuntime(args.name, cmaddr=args.cmaddr)
 symbol_time_buf_u16 = runner.get_id("time_buf_u16")
@@ -129,7 +148,7 @@ try:
   runner.run()
 
   current_nx = nx
-  while current_nx <= MAX_NX:
+  while current_nx <= nx_max:
     print(
         f"Running {'Allreduce' if is_allred else 'Reduce'} for Pw = {pw}, "
         f"Ph = {ph}, Nx = {current_nx} and algorithm {algo}"
@@ -148,7 +167,18 @@ try:
       )
 
       print("DONE!")
-      write_result(dim, algo, is_allred, current_nx, pw, ph, time_start, time_end)
+      write_result(
+          dim,
+          algo,
+          is_allred,
+          current_nx,
+          pw,
+          ph,
+          time_start,
+          time_end,
+          args.results_file,
+          args.csv_file,
+      )
 
     current_nx *= 2
 finally:

@@ -18,6 +18,16 @@ def float_to_hex(f):
 def make_u48(words):
   return words[0] + (words[1] << 16) + (words[2] << 32)
 
+
+def algorithm_name(algo):
+  return {
+      0: "chain",
+      1: "two_phase",
+      2: "tree",
+      3: "star",
+      4: "bine",
+  }.get(algo, f"unknown_{algo}")
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--name', help='the test name')
 parser.add_argument('--cmaddr', help='IP:port for CS system')
@@ -91,8 +101,8 @@ f.write(f'Bcast, B = {Nx}, P = {Pw}, time = {time_end[0,0] - time_start[0,0]}\n'
 f.close()
 
 data = [
-    ["B", "Pw", "time"],
-    [Nx, Pw, time_end[0,0] - time_start[0,0]]
+    ["B", "Pw", "Pattern", "Algorithm", "time"],
+    [Nx, Pw, algo, algorithm_name(algo), time_end[0,0] - time_start[0,0]]
 ]
 csv_file = "data_bcast.csv"
 

@@ -19,6 +19,16 @@ def float_to_hex(f):
 def make_u48(words):
   return words[0] + (words[1] << 16) + (words[2] << 32)
 
+
+def algorithm_name(algo):
+  return {
+      0: "chain",
+      1: "two_phase",
+      2: "tree",
+      3: "star",
+      4: "bine",
+  }.get(algo, f"unknown_{algo}")
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--name', help='the test name')
 parser.add_argument('--cmaddr', help='IP:port for CS system')
@@ -104,12 +114,15 @@ for r in range(measurement_repeats):
   time_end = time_end - time_ref
   print("DONE!")
   f = open("results_2d.txt", "a")
-  f.write(f'2D, Reduce pattern = {algo}, is allreduce = {is_allred}, B = {Nx}, Pw = {Pw}, Ph = {Ph}, time = {np.max(time_end) - np.min(time_start)}\n')
+  f.write(
+      f'2D, Reduce pattern = {algo}, is allreduce = {is_allred}, B = {Nx}, Pw = {Pw}, '
+      f'Ph = {Ph}, time = {np.max(time_end) - np.min(time_start)}, total_time = {np.max(time_end)}\n'
+  )
   f.write(f'minimum start = {np.min(time_start)}, maximum start = {np.max(time_start)}, diff = {np.max(time_start) - np.min(time_start)}\n')
   f.close()
 
-  header = ["Dim", "Pattern", "Allred", "B", "Pw", "Ph", "time", "start_diff"]
-  row = [2, algo, True if (is_allred == 1) else False, Nx, Pw, Ph, np.max(time_end) - np.min(time_start), np.max(time_start) - np.min(time_start)]
+  header = ["Dim", "Pattern", "Algorithm", "Allred", "B", "Pw", "Ph", "time", "total_time", "start_diff"]
+  row = [2, algo, algorithm_name(algo), True if (is_allred == 1) else False, Nx, Pw, Ph, np.max(time_end) - np.min(time_start), np.max(time_end), np.max(time_start) - np.min(time_start)]
   csv_file = "data_2d.csv"
 
   with open(csv_file, mode='a', newline='') as file:
@@ -171,12 +184,15 @@ for r in range(measurement_repeats):
   time_end = time_end - time_ref
   print("DONE!")
   f = open("results_2d.txt", "a")
-  f.write(f'2D, Reduce pattern = {algo}, is allreduce = {is_allred}, B = {Nx}, Pw = {Pw}, Ph = {Ph}, time = {np.max(time_end) - np.min(time_start)}\n')
+  f.write(
+      f'2D, Reduce pattern = {algo}, is allreduce = {is_allred}, B = {Nx}, Pw = {Pw}, '
+      f'Ph = {Ph}, time = {np.max(time_end) - np.min(time_start)}, total_time = {np.max(time_end)}\n'
+  )
   f.write(f'minimum start = {np.min(time_start)}, maximum start = {np.max(time_start)}, diff = {np.max(time_start) - np.min(time_start)}\n')
   f.close()
 
-  header = ["Dim", "Pattern", "Allred", "B", "Pw", "Ph", "time", "start_diff"]
-  row = [2, algo, True if (is_allred == 1) else False, Nx, Pw, Ph, np.max(time_end) - np.min(time_start), np.max(time_start) - np.min(time_start)]
+  header = ["Dim", "Pattern", "Algorithm", "Allred", "B", "Pw", "Ph", "time", "total_time", "start_diff"]
+  row = [2, algo, algorithm_name(algo), True if (is_allred == 1) else False, Nx, Pw, Ph, np.max(time_end) - np.min(time_start), np.max(time_end), np.max(time_start) - np.min(time_start)]
   csv_file = "data_2d.csv"
 
   with open(csv_file, mode='a', newline='') as file:
